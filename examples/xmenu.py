@@ -1,1 +1,1 @@
-/home/anton/xmenu/xmenu.py
+/home/lovesuper/projects/xmenu/xmenu.py

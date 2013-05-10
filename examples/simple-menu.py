@@ -1,4 +1,3 @@
-import sys
 import xmenu
 
 
@@ -16,6 +15,14 @@ class CommandTwo(xmenu.Item):
 
     def __call__(self):
         print 'CommandTwo performed.'
+
+
+class CommandThree(xmenu.Item):
+
+    ''' CommandThree doc string '''
+
+    def __call__(self):
+        print 'CommandThree performed.'
 
 
 @xmenu.Item(name='myFunction', color='red')
@@ -38,11 +45,12 @@ main_menu.add(
         ),
     ),
     command_three,
+    CommandThree(),
 )
 
 
 def main():
-    xmenu.App(menu=main_menu, stdout=sys.stdout)()
+    xmenu.App(menu=main_menu)()
 
 
 if __name__ == '__main__':

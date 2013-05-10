@@ -1,23 +1,11 @@
 # -*- coding: utf-8 -*-
 import sys
-from inspect import getdoc
 from cmd2 import Cmd
+from inspect import getdoc
 
-
-def history():
-    ''' Static function for stack history '''
-
-    history.stack = list()
-    history.backward = lambda: (history.stack.pop(),
-                                history.stack.pop())
-    while(True):
-        history.stack.append((yield))
-
-_hist = history()
-next(_hist)
-
-
-colors = {
+PROMPT = '>> '
+DELIMITER = '-' * 55
+COLORS = {
     'bold': {True: '\x1b[1m', False: '\x1b[22m'},
     'cyan': {True: '\x1b[36m', False: '\x1b[39m'},
     'blue': {True: '\x1b[34m', False: '\x1b[39m'},
@@ -28,8 +16,21 @@ colors = {
 }
 
 
-def colorize(string, color):
-    color = colors[color]
+def history():
+    ''' Static function for stack history '''
+
+    history.stack = list()
+    history.backward = lambda: (history.stack.pop(), history.stack.pop())
+    while True:
+        history.stack.append((yield))
+
+stack = history()
+next(stack)
+
+
+def _colorize(string, color):
+    color = COLORS[color]
+
     return color[True] + string + color[False]
 
 
@@ -41,14 +42,12 @@ class Item(str):
         return str.__new__(cls, name)
 
     def __init__(self, name=None, color='bold'):
-        if name is None:
-            name = self.__class__.__name__
-        self.name = name
-        self.color = color
+        self.name = _colorize(name or self.__class__.__name__, color)
+        self.__doc__ = self.__doc__ or 'No doc.'
 
     def __call__(self, func, *args, **kw):
         func.name = self.name
-        func.color = self.color
+
         return func
 
 
@@ -57,8 +56,8 @@ class Back(Item):
     ''' Move into parent menu.'''
 
     def __call__(self):
-        __, menu = history.backward()
-        App(menu=menu, stdout=sys.stdout)()
+        __, prev_menu = history.backward()
+        App(menu=prev_menu)()
 
 
 class Help(Item):
@@ -66,20 +65,18 @@ class Help(Item):
         ''' Getting help.'''
 
         def __init__(self, name, color, app):
-            delimiter = '-' * 55
-            self.doc = delimiter
+            self.doc = DELIMITER
             self.doc += '\n App : {0}'.format(
                 getdoc(app.__class__) or 'No doc.\n'
             )
-            for key, obj in app.menu.items():
-                doc = getdoc(app.menu[key])
-                self.doc += '\n {0} : {1}'.format(key, doc)
+            for key, obj in app.menu.iteritems():
+                self.doc += '\n{0} : {1}'.format(key, getdoc(app.menu[key]))
 
-            self.doc += '\n{0}\n'.format(delimiter)
+            self.doc += '\n{0}\n'.format(DELIMITER)
             Item.__init__(self, name, color)
 
         def __call__(self):
-            sys.stdout.write(str(self.doc) + '\n')
+            sys.stdout.write(str(self.doc))
 
 
 class Menu(dict):
@@ -87,8 +84,7 @@ class Menu(dict):
     ''' Class that represents complex menu item'''
 
     def __init__(self, name='MenuItem', color='bold', doc=None, *args, **kw):
-        self.name = name
-        self.color = color
+        self.name = _colorize(name, color)
         self.__doc__ = doc or 'No doc'
         dict.__init__(self, *args)
 
@@ -96,13 +92,11 @@ class Menu(dict):
         return self.name
 
     def __call__(self):
-        App(menu=self, stdout=sys.stdout)()
+        App(menu=self)()
 
     def add(self, *items):
-        for item in items:
-            item.__doc__ = item.__doc__ or 'No doc.'
-            item.name = colorize(item.name, item.color)
-            self.update({item.name: item})
+        map(lambda e: self.update({e.name: e}), items)
+
         return self
 
 
@@ -110,39 +104,34 @@ class App(Cmd, object):
 
     ''' This is the app template '''
 
-    prompt = '>> '
-
-    def __init__(self, menu, stdout):
-        Cmd.__init__(self, 'tab', stdin=sys.stdin, stdout=stdout)
-        self.stdout = stdout or sys.stdout
+    def __init__(self, menu):
+        Cmd.__init__(self, 'tab', stdin=sys.stdin, stdout=sys.stdout)
         self.menu = menu
-        if history.stack:
-            self.menu.add(Back())
 
         @Item(name='Exit', color='bold')
         def Exit():
             sys.exit('bye.')
 
-        self.menu.add(Exit)
-        self.menu.add(Help(name='Help', color='blue', app=self))
-        _hist.send(self.menu)
+        self.menu.add(Exit, Help(name='Help', color='blue', app=self))
+        if history.stack:
+            self.menu.add(Back())
+
+        stack.send(self.menu)
 
     def __call__(self):
         ''' Run apps loop'''
-
-        self._output(self.menu.name.upper())
+        self._output(self.menu.name)
         try:
-            item = self.select(sorted(self.menu, reverse=True), self.prompt)
-        except IndexError:
-            self._output('No such command!')
+            item = self.menu[self.select(sorted(self.menu, reverse=True),
+                                         PROMPT)]
         except (KeyboardInterrupt, EOFError):
             sys.exit('\nbye.')
+        except IndexError:
+            self._output('No such command!')
         else:
             item()
+
         self()
 
-    def select(self, variants, string):
-        return self.menu[Cmd.select(self, variants, string)]
-
     def _output(self, output):
-        self.stdout.write('{0}\n'.format(output))
+        sys.stdout.write('{0}\n'.format(output))
