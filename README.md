@@ -2,7 +2,7 @@
  XMenu: Simple way to console menu
 ===========================================
 pre-alpha version 0.0.2
-Антон - дурак
+
 Overview
 ========
 XMenu is a mini-library for easy constructing console menus
