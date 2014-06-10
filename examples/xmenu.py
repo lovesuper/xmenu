@@ -1,1 +1,0 @@
-/home/lovesuper/projects/xmenu/xmenu.py
